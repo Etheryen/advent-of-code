@@ -23,7 +23,7 @@ func InputToLines(file string) []string {
 func PrintArray[T any](arr []T) {
 	fmt.Println("[")
 	for _, element := range arr {
-		fmt.Println("  ", element, ",")
+		fmt.Printf("  %v,\n", element)
 	}
 	fmt.Println("]")
 }

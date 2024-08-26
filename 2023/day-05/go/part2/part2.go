@@ -15,10 +15,190 @@ type AlmanacRange struct {
 	length           int
 }
 
-type SeedRange struct {
-	start int
-	end   int
+func (ar *AlmanacRange) diff() int {
+	return ar.destinationStart - ar.sourceStart
 }
+
+func (ar *AlmanacRange) sourceInclusiveEnd() int {
+	return ar.sourceStart + ar.length - 1
+}
+
+type SeedRange struct {
+	start  int
+	length int
+}
+
+func (sr *SeedRange) inclusiveEnd() int {
+	return sr.start + sr.length - 1
+}
+
+func transformSeedRangeIntoRanges(
+	seedRange SeedRange,
+	almanacRange AlmanacRange,
+) []SeedRange {
+	// 1/5 If seeedRange is either entirely excluded from alamanacRange
+	if seedRange.inclusiveEnd() < almanacRange.sourceStart ||
+		seedRange.start > almanacRange.sourceInclusiveEnd() {
+		return []SeedRange{seedRange}
+	}
+
+	// 2/5 If seeedRange is included entirely included in alamanacRange
+	if seedRange.start >= almanacRange.sourceStart &&
+		seedRange.inclusiveEnd() <= almanacRange.sourceInclusiveEnd() {
+		return []SeedRange{
+			{
+				start:  seedRange.start + almanacRange.diff(),
+				length: seedRange.length,
+			},
+		}
+	}
+
+	// 3/5 If seedRange is in a left union with alamancRange
+	if seedRange.start < almanacRange.sourceStart &&
+		seedRange.inclusiveEnd() >= almanacRange.sourceStart &&
+		seedRange.inclusiveEnd() <= almanacRange.sourceInclusiveEnd() {
+		fmt.Println("\tLEFT UNION")
+		return []SeedRange{}
+	}
+
+	// 4/5 If seedRange is in a right union with alamancRange
+	if seedRange.inclusiveEnd() > almanacRange.sourceInclusiveEnd() &&
+		seedRange.start <= almanacRange.sourceInclusiveEnd() &&
+		seedRange.start >= almanacRange.sourceStart {
+		fmt.Println("\tRIGHT UNION")
+		return []SeedRange{}
+	}
+
+	// 5/5 If alamancRange is included entirely in seedRange
+	if seedRange.start < almanacRange.sourceStart &&
+		seedRange.inclusiveEnd() > almanacRange.sourceInclusiveEnd() {
+		fmt.Println("\tDIFFICULT INCLUSION")
+		return []SeedRange{}
+	}
+
+	panic("Unhandled range intersection")
+
+	var result []SeedRange
+
+	if seedRange.start < almanacRange.sourceStart {
+		result = append(result, SeedRange{
+			start:  seedRange.start,
+			length: almanacRange.sourceStart - seedRange.start,
+		})
+	}
+
+	newLength := min(
+		seedRange.inclusiveEnd()-almanacRange.sourceStart,
+		almanacRange.sourceInclusiveEnd()-seedRange.start,
+	)
+
+	result = append(result, SeedRange{
+		start:  almanacRange.sourceStart + almanacRange.diff(),
+		length: newLength,
+	})
+
+	if seedRange.inclusiveEnd() > almanacRange.sourceInclusiveEnd() {
+		start := almanacRange.sourceInclusiveEnd() + 1
+		result = append(result, SeedRange{
+			start:  start,
+			length: min(seedRange.inclusiveEnd()-start, seedRange.length),
+		})
+	}
+
+	return result
+}
+
+func getTransformedRanges(
+	seedRanges []SeedRange,
+	almanacRanges [][]AlmanacRange,
+) []SeedRange {
+	fmt.Println("seedRanges:")
+	utils.PrintArray(seedRanges)
+	fmt.Println("almanacRanges:")
+	utils.PrintArray(almanacRanges)
+
+	var transformedRanges []SeedRange
+
+	// TODO: fix not using transformed ranges in next iterations
+	for _, almanacRangeSet := range almanacRanges {
+		for _, seedRange := range seedRanges {
+			for _, almanacRange := range almanacRangeSet {
+				fmt.Println(
+					"seedRange:",
+					seedRange,
+					"almanacRange:",
+					almanacRange,
+				)
+
+				newRanges := transformSeedRangeIntoRanges(
+					seedRange,
+					almanacRange,
+				)
+
+				fmt.Println(
+					"ranges from transformation:", newRanges)
+
+				transformedRanges = append(transformedRanges, newRanges...)
+			}
+		}
+		fmt.Println("RANGES:", seedRanges)
+		seedRanges = withoutDuplicates(transformedRanges)
+		transformedRanges = []SeedRange{}
+	}
+
+	return seedRanges
+}
+
+func withoutDuplicates(ranges []SeedRange) []SeedRange {
+	var result []SeedRange
+
+	for _, r := range ranges {
+		if !slices.ContainsFunc(result, func(testRange SeedRange) bool {
+			return r.start == testRange.start && r.length == testRange.length
+		}) {
+			result = append(result, r)
+		}
+	}
+
+	return result
+}
+
+func lowestLocation(ranges []SeedRange) int {
+	result := ranges[0].start
+
+	for _, r := range ranges {
+		if r.start < result {
+			result = r.start
+		}
+	}
+
+	return result
+}
+
+func solve(lines []string) int {
+	seeds := getSeeds(lines[0])
+	seedRanges := getSeedRanges(seeds)
+	almanacMaps := getAlmanacMaps(lines)
+	almanacRanges := getAlmanacRanges(almanacMaps)
+
+	transformedRanges := getTransformedRanges(seedRanges, almanacRanges)
+
+	fmt.Println("transformedRanges:")
+	utils.PrintArray(transformedRanges)
+
+	// TODO: find smallest number in final ranges
+
+	return lowestLocation(transformedRanges)
+}
+
+func main() {
+	lines := utils.InputToLines("input.txt")
+	// fmt.Println("lines:")
+	// utils.PrintArray(lines)
+	fmt.Println("\nsolved:", solve(lines))
+}
+
+// -- PARSING --
 
 func getSeeds(line string) []int {
 	var seeds []int
@@ -41,14 +221,11 @@ func getAlmanacMaps(lines []string) [][][]int {
 			linesWithoutSeeds = append(linesWithoutSeeds, line)
 		}
 	}
-
-	currSegment := -1
+	currMap := -1
 
 	for _, line := range linesWithoutSeeds {
-		// fmt.Println("maps:", maps)
-		// fmt.Println("line:", line, "currSegment:", currSegment)
 		if strings.Contains(line, "map") {
-			currSegment++
+			currMap++
 			maps = append(maps, [][]int{})
 			continue
 		}
@@ -58,11 +235,10 @@ func getAlmanacMaps(lines []string) [][][]int {
 
 		for _, numStr := range numStrings {
 			numInt, _ := strconv.Atoi(numStr)
-			// fmt.Println("numInt:", numInt)
 			lineNums = append(lineNums, numInt)
 		}
-		maps[currSegment] = append(
-			maps[currSegment],
+		maps[currMap] = append(
+			maps[currMap],
 			lineNums,
 		)
 	}
@@ -96,184 +272,15 @@ func getAlmanacRanges(maps [][][]int) [][]AlmanacRange {
 	return mapsRanges
 }
 
-func getTransformedNumbers(seeds []int, mapsRanges [][]AlmanacRange) []int {
-	cache := make(map[int]int)
-	var transformedNumbers []int
-
-	for _, seed := range seeds {
-		if _, ok := cache[seed]; ok {
-			fmt.Println("cache hit on seed:", seed)
-			continue
-		}
-		originalSeed := seed
-		fmt.Println("original seed:", seed)
-		for _, rangeArr := range mapsRanges {
-			fmt.Println("    seed:", seed)
-			var correctRange AlmanacRange
-
-			for _, mapRange := range rangeArr {
-				if mapRange.sourceStart <= seed &&
-					mapRange.sourceStart+mapRange.length > seed {
-					correctRange = mapRange
-				}
-			}
-			fmt.Println("    correctRange:", correctRange)
-
-			if correctRange.length == 0 {
-				continue
-			}
-
-			seed = correctRange.destinationStart + seed - correctRange.sourceStart
-		}
-		transformedNumbers = append(transformedNumbers, seed)
-		cache[originalSeed] = seed
-	}
-
-	return transformedNumbers
-}
-
-func getAllPossibleSeeds(seeds []int) []int {
-	var allSeedsLength int
-
-	for i := 1; i < len(seeds); i += 2 {
-		allSeedsLength += seeds[i]
-	}
-
-	allPossibleSeeds := make([]int, 0, allSeedsLength)
-
-	seedStart := -1
-	for _, seed := range seeds {
-		fmt.Println(
-			"seed:",
-			seed,
-			"start:",
-			seedStart,
-		)
-		if seedStart == -1 {
-			seedStart = seed
-			continue
-		}
-		for i := seedStart; i < seedStart+seed; i++ {
-			fmt.Println("i:", i)
-			if slices.Contains(allPossibleSeeds, i) {
-				fmt.Println("cache")
-				continue
-			}
-			allPossibleSeeds = append(allPossibleSeeds, i)
-		}
-		seedStart = -1
-	}
-
-	return allPossibleSeeds
-}
-
 func getSeedRanges(seeds []int) []SeedRange {
 	var seedRanges []SeedRange
 
 	for i := 0; i < len(seeds); i += 2 {
 		seedRanges = append(
 			seedRanges,
-			SeedRange{start: seeds[i], end: seeds[i] + seeds[i+1]},
+			SeedRange{start: seeds[i], length: seeds[i+1]},
 		)
 	}
 
 	return seedRanges
-}
-
-func getTransformedSeedRangeIntoRanges(
-	seedRange SeedRange,
-	almanacRange AlmanacRange,
-) []SeedRange {
-	if seedRange.start > almanacRange.sourceStart+almanacRange.length ||
-		seedRange.end < almanacRange.sourceStart {
-		return []SeedRange{seedRange}
-	}
-
-	var result []SeedRange
-
-	currNum := seedRange.start
-	for currNum <= seedRange.end {
-		diff := almanacRange.destinationStart - almanacRange.sourceStart
-
-		end := min(
-			almanacRange.destinationStart+almanacRange.length,
-			seedRange.end+diff,
-		)
-
-		result = append(result, SeedRange{
-			start: currNum + diff,
-			end:   end,
-		})
-
-		fmt.Println("result:", result)
-
-		fmt.Println("diff:", diff)
-		break
-	}
-
-	return result
-}
-
-func getTransformedRanges(
-	seedRanges []SeedRange,
-	almanacRanges [][]AlmanacRange,
-) []SeedRange {
-	var transformedRanges []SeedRange
-
-	fmt.Println("seedRanges:")
-	utils.PrintArray(seedRanges)
-	fmt.Println("almanacRanges:")
-	utils.PrintArray(almanacRanges)
-
-	for _, seedRange := range seedRanges {
-		for _, almanacRangeSet := range almanacRanges {
-			for _, almanacRange := range almanacRangeSet {
-				fmt.Println(
-					"seedRange:",
-					seedRange,
-					"almanacRange:",
-					almanacRange,
-				)
-				fmt.Println(
-					"ranges from transformation:",
-					getTransformedSeedRangeIntoRanges(seedRange, almanacRange),
-				)
-			}
-			break
-		}
-		break
-	}
-
-	return transformedRanges
-}
-
-func solve(lines []string) int {
-	seeds := getSeeds(lines[0])
-	// allPossibleSeeds := getAllPossibleSeeds(seeds)
-	// fmt.Println("allPossibleSeeds:", allPossibleSeeds)
-
-	seedRanges := getSeedRanges(seeds)
-	almanacMaps := getAlmanacMaps(lines)
-	almanacRanges := getAlmanacRanges(almanacMaps)
-
-	// transformedNumbers := getTransformedNumbers(seeds, mapsRanges)
-	transformedRanges := getTransformedRanges(seedRanges, almanacRanges)
-	fmt.Println("transformedRanges:")
-	utils.PrintArray(transformedRanges)
-
-	// lowest := transformedNumbers[0]
-	// for _, num := range transformedNumbers {
-	// 	if num < lowest {
-	// 		lowest = num
-	// 	}
-	// }
-
-	return 0
-}
-
-func main() {
-	lines := utils.InputToLines("input0.txt")
-	// fmt.Println("lines:")
-	// utils.PrintArray(lines)
-	fmt.Println("\nsolved:", solve(lines))
 }
