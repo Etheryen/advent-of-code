@@ -5,7 +5,7 @@ use std::{
     time::Instant,
 };
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 enum Direction {
     Up,
     Right,
@@ -25,7 +25,7 @@ impl Direction {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 struct Guard {
     direction: Direction,
     coords: Coordinates,
@@ -138,11 +138,29 @@ fn to_room(lines: &[&str]) -> Room {
     }
 }
 
+fn to_distinct_positions(
+    obstacles: &HashSet<Coordinates>,
+    mut guard: Guard,
+    room: &Room,
+) -> HashSet<Coordinates> {
+    let mut seen: HashSet<Coordinates> = HashSet::new();
+
+    while !guard.is_out_of_room(room) {
+        seen.insert(guard.coords.clone());
+        guard.act(obstacles);
+    }
+
+    seen
+}
+
 fn to_possible_obstacles(
     lines: &[&str],
     obstacles: &HashSet<Coordinates>,
     guard: &Guard,
+    room: &Room,
 ) -> HashSet<Coordinates> {
+    let guard_positions = to_distinct_positions(obstacles, guard.clone(), room);
+
     let mut possible_obstacles = HashSet::new();
 
     for (y, line) in lines.iter().enumerate() {
@@ -152,7 +170,7 @@ fn to_possible_obstacles(
                 y: y as i32,
             };
 
-            if !obstacles.contains(&coords) && coords != guard.coords {
+            if guard_positions.contains(&coords) && coords != guard.coords {
                 possible_obstacles.insert(coords);
             }
         }
@@ -171,7 +189,7 @@ fn is_loop(obstacles: HashSet<Coordinates>, mut guard: Guard, room: &Room) -> bo
 
         let times = seen_times.entry(guard.coords.clone()).or_insert(0);
         *times += 1;
-        if *times > 10 {
+        if *times > 4 {
             return true;
         }
 
@@ -186,6 +204,8 @@ fn to_loops(
     room: Room,
 ) -> u32 {
     let mut loops = 0;
+
+    println!("{}", possible_obstacles.len());
 
     for possible_obstacle in possible_obstacles {
         let mut obstacles_copy = obstacles.clone();
@@ -203,7 +223,7 @@ fn solve(lines: Vec<&str>) -> u32 {
     let obstacles = to_obstacles(&lines);
     let guard = to_guard(&lines);
     let room = to_room(&lines);
-    let possible_obstacles = to_possible_obstacles(&lines, &obstacles, &guard);
+    let possible_obstacles = to_possible_obstacles(&lines, &obstacles, &guard, &room);
     to_loops(possible_obstacles, obstacles, guard, room)
 }
 
