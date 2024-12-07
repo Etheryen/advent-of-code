@@ -1,3 +1,5 @@
+use std::{collections::HashSet, ops::Range};
+
 impl From<&str> for Almanac {
     fn from(file: &str) -> Self {
         let lines = file
@@ -16,6 +18,7 @@ pub struct Almanac {
 pub trait ToSeedStuff {
     fn to_seed_maps(self) -> Vec<SeedMap>;
     fn to_seeds(&self) -> Vec<u64>;
+    fn to_seeds_from_ranges(&self) -> HashSet<u64>;
     fn to_seed_ranges(&self) -> Vec<SeedRange>;
 }
 
@@ -25,6 +28,9 @@ impl ToSeedStuff for Almanac {
     }
     fn to_seeds(&self) -> Vec<u64> {
         to_seeds(self.lines.first().unwrap())
+    }
+    fn to_seeds_from_ranges(&self) -> HashSet<u64> {
+        to_seeds_from_ranges(self.lines.first().unwrap())
     }
     fn to_seed_ranges(&self) -> Vec<SeedRange> {
         to_seed_ranges(self.lines.first().unwrap())
@@ -121,6 +127,25 @@ fn to_seeds(line: &str) -> Vec<u64> {
         .skip(1)
         .map(|seed| seed.parse().unwrap())
         .collect()
+}
+
+fn to_seeds_from_ranges(line: &str) -> HashSet<u64> {
+    let mut seeds = HashSet::new();
+
+    let nums = line
+        .split_whitespace()
+        .skip(1)
+        .map(|seed| seed.parse::<u64>().unwrap())
+        .collect::<Vec<_>>();
+
+    for pair in nums.chunks(2) {
+        println!("{:?}", pair);
+        for seed in pair[0]..(pair[0] + pair[1]) {
+            seeds.insert(seed);
+        }
+    }
+
+    seeds
 }
 
 fn to_seed_maps(lines: Vec<String>) -> Vec<SeedMap> {
