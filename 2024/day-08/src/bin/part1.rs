@@ -1,4 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    cmp::Ordering::{Greater, Less},
+    collections::{HashMap, HashSet},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct Coordinates {
@@ -63,53 +66,24 @@ fn to_antinode_pair(coords1: &Coordinates, coords2: &Coordinates) -> (Coordinate
     let x_diff = (coords1.x - coords2.x).abs();
     let y_diff = (coords1.y - coords2.y).abs();
 
-    if coords1.x > coords2.x {
-        if coords1.y > coords2.y {
-            (
-                Coordinates {
-                    x: coords1.x + x_diff,
-                    y: coords1.y + y_diff,
-                },
-                Coordinates {
-                    x: coords2.x - x_diff,
-                    y: coords2.y - y_diff,
-                },
-            )
-        } else {
-            (
-                Coordinates {
-                    x: coords1.x + x_diff,
-                    y: coords1.y - y_diff,
-                },
-                Coordinates {
-                    x: coords2.x - x_diff,
-                    y: coords2.y + y_diff,
-                },
-            )
-        }
-    } else if coords1.y > coords2.y {
-        (
-            Coordinates {
-                x: coords1.x - x_diff,
-                y: coords1.y + y_diff,
-            },
-            Coordinates {
-                x: coords2.x + x_diff,
-                y: coords2.y - y_diff,
-            },
-        )
-    } else {
-        (
-            Coordinates {
-                x: coords1.x - x_diff,
-                y: coords1.y - y_diff,
-            },
-            Coordinates {
-                x: coords2.x + x_diff,
-                y: coords2.y + y_diff,
-            },
-        )
-    }
+    let (dx1, dy1, dx2, dy2) = match (coords1.x.cmp(&coords2.x), coords1.y.cmp(&coords2.y)) {
+        (Greater, Greater) => (1, 1, -1, -1),
+        (Greater, Less) => (1, -1, -1, 1),
+        (Less, Greater) => (-1, 1, 1, -1),
+        (Less, Less) => (-1, -1, 1, 1),
+        _ => unreachable!(),
+    };
+
+    (
+        Coordinates {
+            x: coords1.x + dx1 * x_diff,
+            y: coords1.y + dy1 * y_diff,
+        },
+        Coordinates {
+            x: coords2.x + dx2 * x_diff,
+            y: coords2.y + dy2 * y_diff,
+        },
+    )
 }
 
 fn to_antinodes(antennas: &HashMap<char, HashSet<Coordinates>>, map: &Map) -> HashSet<Coordinates> {

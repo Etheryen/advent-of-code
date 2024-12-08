@@ -1,4 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    cmp::Ordering::{Greater, Less},
+    collections::{HashMap, HashSet},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct Coordinates {
@@ -59,153 +62,53 @@ fn is_in_map(coords: &Coordinates, map: &Map) -> bool {
         && coords.y < map.y_length as i32
 }
 
+fn insert_new_antidotes(
+    coords1: &Coordinates,
+    coords2: &Coordinates,
+    dx: i32,
+    dy: i32,
+    target: &mut HashSet<Coordinates>,
+    map: &Map,
+) {
+    let x_diff = (coords1.x - coords2.x).abs();
+    let y_diff = (coords1.y - coords2.y).abs();
+
+    let mut curr_x_diff = x_diff;
+    let mut curr_y_diff = y_diff;
+
+    loop {
+        let new_antinode = Coordinates {
+            x: coords1.x + dx * curr_x_diff,
+            y: coords1.y + dy * curr_y_diff,
+        };
+        if !is_in_map(&new_antinode, map) {
+            break;
+        }
+        target.insert(new_antinode);
+        curr_x_diff += x_diff;
+        curr_y_diff += y_diff;
+    }
+}
+
 fn to_new_antinodes(
     coords1: &Coordinates,
     coords2: &Coordinates,
     map: &Map,
 ) -> HashSet<Coordinates> {
-    let x_diff = (coords1.x - coords2.x).abs();
-    let y_diff = (coords1.y - coords2.y).abs();
-
     let mut new_antinodes = HashSet::new();
 
-    if coords1.x > coords2.x {
-        if coords1.y > coords2.y {
-            let mut curr_x_diff = x_diff;
-            let mut curr_y_diff = y_diff;
+    let (dx1, dy1, dx2, dy2) = match (coords1.x.cmp(&coords2.x), coords1.y.cmp(&coords2.y)) {
+        (Greater, Greater) => (1, 1, -1, -1),
+        (Greater, Less) => (1, -1, -1, 1),
+        (Less, Greater) => (-1, 1, 1, -1),
+        (Less, Less) => (-1, -1, 1, 1),
+        _ => unreachable!(),
+    };
 
-            loop {
-                let new_antinode = Coordinates {
-                    x: coords1.x + curr_x_diff,
-                    y: coords1.y + curr_y_diff,
-                };
-                if !is_in_map(&new_antinode, map) {
-                    break;
-                }
-                new_antinodes.insert(new_antinode);
-                curr_x_diff += x_diff;
-                curr_y_diff += y_diff;
-            }
+    insert_new_antidotes(coords1, coords2, dx1, dy1, &mut new_antinodes, map);
+    insert_new_antidotes(coords1, coords2, dx2, dy2, &mut new_antinodes, map);
 
-            curr_x_diff = x_diff;
-            curr_y_diff = y_diff;
-
-            loop {
-                let new_antinode = Coordinates {
-                    x: coords1.x - curr_x_diff,
-                    y: coords1.y - curr_y_diff,
-                };
-                if !is_in_map(&new_antinode, map) {
-                    break;
-                }
-                new_antinodes.insert(new_antinode);
-                curr_x_diff += x_diff;
-                curr_y_diff += y_diff;
-            }
-
-            return new_antinodes;
-        } else {
-            let mut curr_x_diff = x_diff;
-            let mut curr_y_diff = y_diff;
-
-            loop {
-                let new_antinode = Coordinates {
-                    x: coords1.x + curr_x_diff,
-                    y: coords1.y - curr_y_diff,
-                };
-                if !is_in_map(&new_antinode, map) {
-                    break;
-                }
-                new_antinodes.insert(new_antinode);
-                curr_x_diff += x_diff;
-                curr_y_diff += y_diff;
-            }
-
-            curr_x_diff = x_diff;
-            curr_y_diff = y_diff;
-
-            loop {
-                let new_antinode = Coordinates {
-                    x: coords1.x - curr_x_diff,
-                    y: coords1.y + curr_y_diff,
-                };
-                if !is_in_map(&new_antinode, map) {
-                    break;
-                }
-                new_antinodes.insert(new_antinode);
-                curr_x_diff += x_diff;
-                curr_y_diff += y_diff;
-            }
-
-            return new_antinodes;
-        }
-    } else if coords1.y > coords2.y {
-        let mut curr_x_diff = x_diff;
-        let mut curr_y_diff = y_diff;
-
-        loop {
-            let new_antinode = Coordinates {
-                x: coords1.x - curr_x_diff,
-                y: coords1.y + curr_y_diff,
-            };
-            if !is_in_map(&new_antinode, map) {
-                break;
-            }
-            new_antinodes.insert(new_antinode);
-            curr_x_diff += x_diff;
-            curr_y_diff += y_diff;
-        }
-
-        curr_x_diff = x_diff;
-        curr_y_diff = y_diff;
-
-        loop {
-            let new_antinode = Coordinates {
-                x: coords1.x + curr_x_diff,
-                y: coords1.y - curr_y_diff,
-            };
-            if !is_in_map(&new_antinode, map) {
-                break;
-            }
-            new_antinodes.insert(new_antinode);
-            curr_x_diff += x_diff;
-            curr_y_diff += y_diff;
-        }
-        return new_antinodes;
-    } else {
-        let mut curr_x_diff = x_diff;
-        let mut curr_y_diff = y_diff;
-
-        loop {
-            let new_antinode = Coordinates {
-                x: coords1.x - curr_x_diff,
-                y: coords1.y - curr_y_diff,
-            };
-            if !is_in_map(&new_antinode, map) {
-                break;
-            }
-            new_antinodes.insert(new_antinode);
-            curr_x_diff += x_diff;
-            curr_y_diff += y_diff;
-        }
-
-        curr_x_diff = x_diff;
-        curr_y_diff = y_diff;
-
-        loop {
-            let new_antinode = Coordinates {
-                x: coords1.x + curr_x_diff,
-                y: coords1.y + curr_y_diff,
-            };
-            if !is_in_map(&new_antinode, map) {
-                break;
-            }
-            new_antinodes.insert(new_antinode);
-            curr_x_diff += x_diff;
-            curr_y_diff += y_diff;
-        }
-        return new_antinodes;
-    }
+    new_antinodes
 }
 
 fn to_antinodes(antennas: &HashMap<char, HashSet<Coordinates>>, map: &Map) -> HashSet<Coordinates> {
